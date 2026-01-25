@@ -1,8 +1,7 @@
 <?php
 // create_session.php
-// DIAGNOSTIC VERSION
 
-// 1. CORS
+// 1. ALLOW ACCESS
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
     header('Access-Control-Allow-Credentials: true');
@@ -19,50 +18,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 header("Content-Type: application/json");
 
 // 2. CONFIGURATION
-$clientId = "221824db5358d75f20a38abd628122";      
-$clientSecret = "cfsk ma test c2396f942ba6b54192c36e27acef6ed9 1bb935c6"; 
+$clientId = "YOUR_TEST_APP_ID";      
+$clientSecret = "YOUR_TEST_SECRET_KEY"; 
 $env_url = "https://sandbox.cashfree.com/pg/orders";
 
 // 3. READ INPUT
 $rawInput = file_get_contents('php://input');
 $input = json_decode($rawInput, true);
 
-// --- DIAGNOSTIC CHECK ---
-// If input is empty, tell the user exactly what the raw input was
 if (!$input) {
-    echo json_encode([
-        "status" => "error", 
-        "message" => "Server received empty data. Raw Input: '" . $rawInput . "'"
-    ]);
+    echo json_encode(["status" => "error", "message" => "Empty data received."]);
     exit();
 }
 
-// Check missing fields
+// --- FIX: MAP INPUTS CORRECTLY ---
+// Your JS sends 'customerPhone', but we assign it to a simple variable
+$phone = $input['phone'] ?? $input['customerPhone'] ?? null;
+$name  = $input['name']  ?? $input['customerName']  ?? "Customer";
+$email = $input['email'] ?? "guest@copycut.com";
+$orderId = $input['orderId'] ?? null;
+$amount = $input['amount'] ?? null;
+
+// Validate
 $missing = [];
-if (!isset($input['orderId'])) $missing[] = 'orderId';
-if (!isset($input['amount'])) $missing[] = 'amount';
-if (!isset($input['phone'])) $missing[] = 'phone';
+if (!$orderId) $missing[] = 'orderId';
+if (!$amount) $missing[] = 'amount';
+if (!$phone) $missing[] = 'phone';
 
 if (!empty($missing)) {
-    // Show which specific fields are missing and what was actually received
     echo json_encode([
         "status" => "error", 
         "message" => "Missing fields: " . implode(", ", $missing) . ". Received: " . json_encode($input)
     ]);
     exit();
 }
-// ------------------------
 
-// 4. PREPARE DATA
+// 4. PREPARE DATA FOR CASHFREE
 $orderData = [
-    "order_amount" => $input['amount'],
+    "order_amount" => $amount,
     "order_currency" => "INR",
-    "order_id" => $input['orderId'],
+    "order_id" => $orderId,
     "customer_details" => [
-        "customer_id" => "CUST_" . preg_replace('/\D/', '', $input['phone']),
-        "customer_phone" => $input['phone'],
-        "customer_name" => $input['name'] ?? "Customer",
-        "customer_email" => $input['email'] ?? "guest@copycut.com"
+        "customer_id" => "CUST_" . preg_replace('/\D/', '', $phone),
+        "customer_phone" => $phone,
+        "customer_name" => $name,
+        "customer_email" => $email
     ],
     "order_meta" => [
         "return_url" => "https://copycut-backend.onrender.com/payment_success.html?order_id={order_id}"
@@ -83,6 +83,10 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, [
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
 $response = curl_exec($ch);
+if(curl_errno($ch)){
+    echo json_encode(["status" => "error", "message" => 'Curl error: ' . curl_error($ch)]);
+    exit();
+}
 curl_close($ch);
 
 echo $response;
