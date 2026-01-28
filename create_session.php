@@ -1,7 +1,7 @@
 <?php
 // create_session.php
 
-// 1. ALLOW ACCESS
+// 1. ALLOW ACCESS (CORS)
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
     header('Access-Control-Allow-Credentials: true');
@@ -17,10 +17,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 
 header("Content-Type: application/json");
 
-// 2. CONFIGURATION
-$clientId = "YOUR_TEST_APP_ID";      
-$clientSecret = "YOUR_TEST_SECRET_KEY"; 
-$env_url = "https://sandbox.cashfree.com/pg/orders";
+// 2. CONFIGURATION (SECURE)
+// We get keys from Render Environment Variables
+$clientId = getenv('CASHFREE_APP_ID');      
+$clientSecret = getenv('CASHFREE_SECRET_KEY'); 
+
+// SAFETY CHECK: If keys are missing in Render, warn the developer
+if (!$clientId || !$clientSecret) {
+    echo json_encode(["status" => "error", "message" => "Server Config Error: API Keys not set in Render Environment."]);
+    exit();
+}
+
+// MODE: Change to "PRODUCTION" when you go live
+$mode = "SANDBOX"; 
+
+if ($mode === "PRODUCTION") {
+    $env_url = "https://api.cashfree.com/pg/orders";
+} else {
+    $env_url = "https://sandbox.cashfree.com/pg/orders";
+}
 
 // 3. READ INPUT
 $rawInput = file_get_contents('php://input');
@@ -31,8 +46,7 @@ if (!$input) {
     exit();
 }
 
-// --- FIX: MAP INPUTS CORRECTLY ---
-// Your JS sends 'customerPhone', but we assign it to a simple variable
+// 4. MAP INPUTS
 $phone = $input['phone'] ?? $input['customerPhone'] ?? null;
 $name  = $input['name']  ?? $input['customerName']  ?? "Customer";
 $email = $input['email'] ?? "guest@copycut.com";
@@ -48,12 +62,12 @@ if (!$phone) $missing[] = 'phone';
 if (!empty($missing)) {
     echo json_encode([
         "status" => "error", 
-        "message" => "Missing fields: " . implode(", ", $missing) . ". Received: " . json_encode($input)
+        "message" => "Missing fields: " . implode(", ", $missing)
     ]);
     exit();
 }
 
-// 4. PREPARE DATA FOR CASHFREE
+// 5. PREPARE DATA FOR CASHFREE
 $orderData = [
     "order_amount" => $amount,
     "order_currency" => "INR",
@@ -65,11 +79,12 @@ $orderData = [
         "customer_email" => $email
     ],
     "order_meta" => [
+        // Make sure this URL matches your Render App Name
         "return_url" => "https://copycut-backend.onrender.com/payment_success.html?order_id={order_id}"
     ]
 ];
 
-// 5. SEND TO CASHFREE
+// 6. SEND TO CASHFREE
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $env_url);
 curl_setopt($ch, CURLOPT_POST, true);
