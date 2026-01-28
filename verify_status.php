@@ -1,16 +1,14 @@
 <?php
 // verify_status.php
 
-header("Access-Control-Allow-Origin: https://testv11.oneapp.dev/");
+header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 
-// 1. CONFIGURATION
-// ---------------------------------------------------------
-$clientId = "221824db5358d75f20a38abd628122";      
-$clientSecret = "cfsk ma test c2396f942ba6b54192c36e27acef6ed9 1bb935c6"; 
+// 1. CONFIGURATION (SECURE)
+$clientId = getenv('CASHFREE_APP_ID');      
+$clientSecret = getenv('CASHFREE_SECRET_KEY'); 
 
-$mode = "SANDBOX"; // Change to "PRODUCTION" for live
-// ---------------------------------------------------------
+$mode = "SANDBOX"; 
 
 if (!isset($_GET['order_id'])) {
     echo json_encode(["status" => "error", "message" => "Order ID missing"]);
