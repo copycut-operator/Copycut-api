@@ -80,7 +80,7 @@ $orderData = [
     ],
     "order_meta" => [
         // Make sure this URL matches your Render App Name
-        "return_url" => "https://copycut-backend.onrender.com/payment_success.html?order_id={order_id}"
+        "return_url" => "https://copycut-api.onrender.com/payment_success.html?order_id={order_id}"
     ]
 ];
 
